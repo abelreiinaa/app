@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AMR 17 Motorsport - Presupuestos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body{font-family:Inter,Arial,sans-serif}
+    [x-cloak]{display:none!important}
+    .print-only{display:none}
+    .toast-container{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px}
+    .toast{min-width:250px;padding:15px 20px;border-radius:8px;color:white;font-weight:500;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06)}
+    .toast.success{background:#10B981}.toast.info{background:#3B82F6}.toast.error{background:#EF4444}
+    @media print{.no-print{display:none!important}.print-only{display:block!important}body{background:white;padding:0}.container{max-width:100%;box-shadow:none;border:none}input,textarea,select{border:none!important;background:transparent!important;appearance:none}.ventana-cliente{display:block!important}}
+    .ventana-cliente{display:none}
+    @media print{.ventana-cliente{display:block!important}}
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8 text-gray-800">
+  <div x-data="presupuestoApp()" x-init="init()" class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden container border border-gray-200">
+    <div id="toast-container" class="toast-container no-print"></div>
+    <div class="bg-red-700 p-4 md:p-6 text-white flex flex-col md:flex-row justify-between items-center no-print gap-4">
+      <div>
+        <h1 class="text-2xl font-bold">AMR 17 Motorsport</h1>
+        <p class="text-red-100">High Performance Mechanic Shop</p>
+      </div>
+      <div class="flex gap-2">
+        <button type="button" id="btn-cargar-cola" class="bg-white text-red-700 px-4 py-2 rounded-lg font-semibold hover:bg-red-50">Cargar cola</button>
+        <button type="button" id="btn-exportar" class="bg-red-900 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-800">Exportar</button>
+      </div>
+    </div>
+
+    <div class="p-4 md:p-6 space-y-6">
+      <section class="grid grid-cols-1 md:grid-cols-2 gap-4 no-print">
+        <div class="bg-gray-50 p-4 rounded-lg border">
+          <h2 class="font-semibold mb-3">Datos del cliente</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input id="cliente-nombre" class="border rounded px-3 py-2" placeholder="Nombre cliente">
+            <input id="cliente-telefono" class="border rounded px-3 py-2" placeholder="Teléfono">
+            <input id="vehiculo-marca" class="border rounded px-3 py-2" placeholder="Marca">
+            <input id="vehiculo-modelo" class="border rounded px-3 py-2" placeholder="Modelo">
+          </div>
+        </div>
+        <div class="bg-gray-50 p-4 rounded-lg border">
+          <h2 class="font-semibold mb-3">Opciones</h2>
+          <label class="flex items-center gap-2"><input id="mostrar-precios" type="checkbox" checked> Mostrar precios</label>
+          <label class="flex items-center gap-2 mt-2"><input id="impuestos" type="checkbox" checked> Incluir IVA</label>
+        </div>
+      </section>
+
+      <section>
+        <div class="flex items-center justify-between mb-3 no-print">
+          <h2 class="font-semibold">Líneas del presupuesto</h2>
+          <button type="button" id="btn-nueva-linea" class="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-500">Nueva línea</button>
+        </div>
+        <div class="overflow-x-auto border rounded-lg">
+          <table class="min-w-full text-sm">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="text-left p-3">Concepto</th>
+                <th class="text-left p-3">Referencia</th>
+                <th class="text-left p-3">Cantidad</th>
+                <th class="text-left p-3">Coste Ud.</th>
+                <th class="text-left p-3">Precio Ud.</th>
+                <th class="text-left p-3">Total</th>
+                <th class="text-left p-3">Margen</th>
+                <th class="text-left p-3 no-print">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="lineas-body">
+            </tbody>
+          </table>
+        </div>
+        <p id="empty-state" class="text-gray-500 italic mt-3">No hay trabajos previos para este vehículo</p>
+      </section>
+
+      <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-gray-50 p-4 rounded-lg border">
+          <h2 class="font-semibold mb-3">Observaciones</h2>
+          <textarea id="observaciones" class="w-full border rounded p-3 min-h-28" placeholder="Notas del presupuesto"></textarea>
+        </div>
+        <div class="bg-gray-50 p-4 rounded-lg border">
+          <h2 class="font-semibold mb-3">Totales</h2>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between"><span>Base imponible</span><strong id="base-imponible">0,00 €</strong></div>
+            <div class="flex justify-between"><span>IVA</span><strong id="iva-total">0,00 €</strong></div>
+            <div class="flex justify-between text-lg"><span>Total</span><strong id="gran-total">0,00 €</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="ventana-cliente print-only">
+        <h2 class="font-semibold mb-3">Vista cliente</h2>
+        <p>Firma del taller</p>
+        <p class="mt-6">Conforme cliente</p>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'amr17cola';
+    const state = { lineas: [], impuestos: true, mostrarPrecios: true };
+
+    function eur(n){ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(n||0)); }
+    function toast(msg,type='info'){ const c=document.getElementById('toast-container'); const d=document.createElement('div'); d.className='toast '+type; d.textContent=msg; c.appendChild(d); setTimeout(()=>d.remove(),2500); }
+    function save(){ localStorage.setItem('amr17_presupuesto', JSON.stringify(state)); }
+    function load(){ try { const s=JSON.parse(localStorage.getItem('amr17_presupuesto')||'{}'); Object.assign(state,s); } catch(e){} }
+    function calc(){
+      const tbody=document.getElementById('lineas-body');
+      tbody.innerHTML='';
+      let base=0;
+      state.lineas.forEach((l,idx)=>{
+        const coste = Number(l.precio||0);
+        const qty = Math.max(1, Number(l.cantidad||1));
+        const precio = Number(l.precioVenta ?? (coste*1.4));
+        const total = precio*qty;
+        base += total;
+        const margen = coste>0 ? ((precio-coste)/coste*100) : 0;
+        const tr=document.createElement('tr');
+        tr.className='border-t';
+        tr.innerHTML=`<td class="p-3"><input data-k="nombre" data-i="${idx}" class="w-full border rounded px-2 py-1" value="${(l.nombre||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')}"></td>
+          <td class="p-3"><input data-k="referencia" data-i="${idx}" class="w-full border rounded px-2 py-1" value="${(l.referencia||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')}"></td>
+          <td class="p-3"><input data-k="cantidad" data-i="${idx}" type="number" min="1" class="w-24 border rounded px-2 py-1" value="${qty}"></td>
+          <td class="p-3">${state.mostrarPrecios ? `<input data-k="coste" data-i="${idx}" type="number" step="0.01" class="w-28 border rounded px-2 py-1" value="${coste}">` : '<span>-</span>'}</td>
+          <td class="p-3">${state.mostrarPrecios ? `<input data-k="precioVenta" data-i="${idx}" type="number" step="0.01" class="w-28 border rounded px-2 py-1" value="${precio}">` : '<span>-</span>'}</td>
+          <td class="p-3">${state.mostrarPrecios ? eur(total) : '-'}</td>
+          <td class="p-3">${state.mostrarPrecios ? margen.toFixed(1)+'%' : '-'}</td>
+          <td class="p-3 no-print"><button data-del="${idx}" class="text-red-600 font-semibold">Eliminar</button></td>`;
+        tbody.appendChild(tr);
+      });
+      const iva = state.impuestos ? base*0.21 : 0;
+      document.getElementById('base-imponible').textContent = eur(base);
+      document.getElementById('iva-total').textContent = eur(iva);
+      document.getElementById('gran-total').textContent = eur(base+iva);
+      document.getElementById('empty-state').style.display = state.lineas.length ? 'none' : 'block';
+      save();
+    }
+
+    function bind(){
+      document.getElementById('btn-nueva-linea').addEventListener('click', ()=>{ state.lineas.push({nombre:'',referencia:'',cantidad:1,precio:0,precioVenta:0}); calc(); });
+      document.getElementById('btn-cargar-cola').addEventListener('click', async ()=>{ const res = await chrome.storage.local.get([STORAGE_KEY]); const cola = Array.isArray(res[STORAGE_KEY]) ? res[STORAGE_KEY] : []; if(!cola.length){ toast('No hay cola para cargar','error'); return; } cola.forEach(it=>state.lineas.push({nombre:it.nombre||'',referencia:it.referencia||'',cantidad:it.cantidad||1,precio:it.precio||0,precioVenta:it.precio||0,url:it.url||''})); await chrome.storage.local.set({[STORAGE_KEY]:[]}); toast('Cola cargada','success'); calc(); });
+      document.getElementById('btn-exportar').addEventListener('click', ()=>{ toast('Exportación pendiente','info'); });
+      document.getElementById('mostrar-precios').addEventListener('change', e=>{ state.mostrarPrecios=e.target.checked; calc(); });
+      document.getElementById('impuestos').addEventListener('change', e=>{ state.impuestos=e.target.checked; calc(); });
+      document.getElementById('lineas-body').addEventListener('input', e=>{ const i=e.target.dataset.i; const k=e.target.dataset.k; if(i===undefined||!k) return; state.lineas[i][k] = e.target.type==='number' ? Number(e.target.value||0) : e.target.value; calc(); });
+      document.getElementById('lineas-body').addEventListener('click', e=>{ const del = e.target.dataset.del; if(del===undefined) return; state.lineas.splice(Number(del),1); calc(); });
+    }
+
+    function init(){ load(); bind(); calc(); }
+    window.presupuestoApp = () => ({ init });
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

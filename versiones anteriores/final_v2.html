@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AMR 17 Motorsport - Presupuestos</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
+  <style>
+    body{font-family:Inter,Arial,sans-serif}[x-cloak]{display:none!important}.print-only{display:none}.toast-container{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px}.toast{min-width:250px;padding:15px 20px;border-radius:8px;color:white;font-weight:500;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06)}.toast.success{background:#10B981}.toast.info{background:#3B82F6}.toast.error{background:#EF4444}@media print{.no-print{display:none!important}.print-only{display:block!important}body{background:white;padding:0}.container{max-width:100%;box-shadow:none;border:none}input,textarea,select{border:none!important;background:transparent!important;appearance:none}}
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8 text-gray-800">
+  <div x-data="presupuestoApp()" x-init="init()" class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden container border border-gray-200">
+    <div id="toast-container" class="toast-container no-print"></div>
+    <div class="bg-red-700 p-4 md:p-6 text-white flex flex-col md:flex-row justify-between items-center no-print gap-4">
+      <div>
+        <h1 class="text-xl md:text-2xl font-bold">Generador de Presupuestos</h1>
+        <p class="text-sm text-red-100">AMR 17 Motorsport</p>
+      </div>
+      <div class="flex gap-2 flex-wrap justify-center">
+        <button @click="nuevoPresupuesto()" class="bg-red-800 hover:bg-red-900 text-white font-semibold py-2 px-4 rounded-lg">Nuevo</button>
+        <button @click="guardarEnBD()" :disabled="isSaving" class="bg-gray-900 hover:bg-black text-white font-semibold py-2 px-4 rounded-lg disabled:opacity-50" aria-label="Guardar presupuesto"><span x-text="isSaving ? 'Guardando...' : 'Guardar'"></span></button>
+        <button @click="duplicarPresupuesto()" class="bg-indigo-700 hover:bg-indigo-800 text-white font-semibold py-2 px-4 rounded-lg" aria-label="Duplicar presupuesto">Duplicar</button>
+        <button @click="window.print()" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg" aria-label="Imprimir presupuesto">Imprimir</button>
+      </div>
+    </div>
+    <div class="p-6 md:p-8 space-y-8">
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="bg-gray-50 p-4 rounded-lg border">
+          <h2 class="font-bold text-red-700 mb-3">Datos del taller</h2>
+          <div class="space-y-3">
+            <input x-model="datos.taller.nombre" class="w-full border rounded p-2" placeholder="Nombre taller">
+            <input x-model="datos.taller.slogan" class="w-full border rounded p-2" placeholder="Slogan">
+            <input x-model="datos.taller.direccion" class="w-full border rounded p-2" placeholder="Dirección">
+            <div class="grid grid-cols-2 gap-3"><input x-model="datos.taller.telefono" class="w-full border rounded p-2" placeholder="Teléfono"><input x-model="datos.taller.cif" class="w-full border rounded p-2" placeholder="CIF/NIF"></div>
+          </div>
+        </div>
+        <div class="bg-gray-50 p-4 rounded-lg border">
+          <h2 class="font-bold text-red-700 mb-3">Datos del presupuesto</h2>
+          <div class="space-y-3">
+            <input x-model="datos.numero" class="w-full border rounded p-2 bg-gray-100" readonly aria-label="Número de presupuesto">
+            <input type="date" x-model="datos.fecha" class="w-full border rounded p-2" aria-label="Fecha del presupuesto">
+            <div class="grid grid-cols-2 gap-3"><input x-model.number="datos.porcentajeIva" type="number" min="0" step="1" class="w-full border rounded p-2" placeholder="IVA" aria-label="Porcentaje de IVA"><button @click="verHistorialVehiculo()" class="w-full bg-blue-600 text-white rounded p-2 font-semibold" aria-label="Ver historial del vehículo">Ver historial</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="bg-gray-50 p-4 rounded-lg border">
+          <h2 class="font-bold text-red-700 mb-3">Vehículo</h2>
+          <div class="space-y-3">
+            <input x-model="datos.vehiculo.matricula" @blur="buscarVehiculoPorMatricula()" class="w-full border rounded p-2 uppercase" placeholder="Matrícula">
+            <input type="number" x-model.number="datos.vehiculo.kilometros" class="w-full border rounded p-2" placeholder="Kilómetros">
+            <div class="grid grid-cols-2 gap-3"><input x-model="datos.vehiculo.marca" class="w-full border rounded p-2" placeholder="Marca"><input x-model="datos.vehiculo.modelo" class="w-full border rounded p-2" placeholder="Modelo"></div>
+            <input x-model="datos.vehiculo.bastidor" class="w-full border rounded p-2 uppercase" placeholder="Bastidor / VIN">
+            <p class="text-xs text-blue-600" x-show="ultimoKm!==null" x-cloak x-text="`Última vez: ${ultimoKm} km`"></p>
+          </div>
+        </div>
+        <div class="bg-gray-50 p-4 rounded-lg border">
+          <h2 class="font-bold text-red-700 mb-3">Cliente</h2>
+          <div class="space-y-3">
+            <input x-model="datos.cliente.nombre" class="w-full border rounded p-2" placeholder="Nombre / Razón social">
+            <input x-model="datos.cliente.nif" class="w-full border rounded p-2" placeholder="DNI / CIF">
+            <div class="grid grid-cols-2 gap-3"><input x-model="datos.cliente.telefono" class="w-full border rounded p-2" placeholder="Teléfono"><input x-model="datos.cliente.email" type="email" class="w-full border rounded p-2" placeholder="Email"></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold border-l-4 border-red-700 pl-2">Trabajos y repuestos</h2><div class="flex gap-2 no-print"><button @click="addItem('repuesto')" class="bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded border">+ Repuesto</button><button @click="addItem('manoobra')" class="bg-red-50 hover:bg-red-100 px-3 py-2 rounded border border-red-200">+ Mano de obra</button></div></div>
+        <div class="overflow-x-auto border rounded-lg"><table class="w-full text-sm"><thead class="bg-gray-800 text-white"><tr><th class="p-3 text-left">Concepto</th><th class="p-3 text-right">Cantidad</th><th class="p-3 text-right">Precio Ud.</th><th class="p-3 text-right">Total</th><th class="p-3 text-center no-print"></th></tr></thead><tbody><template x-for="(item,index) in items" :key="item.id"><tr class="border-t"><td class="p-2"><input x-model="item.descripcion" class="w-full border rounded p-2" placeholder="Descripción"></td><td class="p-2"><input type="number" min="0" step="1" x-model.number="item.cantidad" class="w-full border rounded p-2 text-right"></td><td class="p-2"><input type="number" min="0" step="0.01" x-model.number="item.precio" class="w-full border rounded p-2 text-right"></td><td class="p-2 text-right font-semibold" x-text="formatCurrency(item.cantidad*item.precio)"></td><td class="p-2 text-center no-print"><button @click="removeItem(index)" class="text-red-600 font-bold">X</button></td></tr></template></tbody></table></div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-6">
+        <div>
+          <h3 class="font-bold mb-2">Observaciones / Condiciones</h3>
+          <div class="no-print mb-3"><label class="block text-sm font-semibold mb-2" for="pdf-cargar">Cargar PDF</label><input id="pdf-cargar" type="file" accept="application/pdf" @change="leerPDF($event)" class="w-full border rounded p-2 bg-white" aria-label="Cargar PDF"></div>
+          <textarea x-model="datos.notas" rows="5" class="w-full border rounded-lg p-3" placeholder="Escribe aquí las condiciones y observaciones" aria-label="Observaciones y condiciones"></textarea>
+        </div>
+        <div class="bg-gray-900 text-white rounded-xl p-6">
+          <div class="flex justify-between py-1"><span>Base imponible</span><span x-text="formatCurrency(subtotal)"></span></div>
+          <div class="flex justify-between py-1"><span>IVA</span><span x-text="datos.porcentajeIva + '%'"></span></div>
+          <div class="flex justify-between py-1"><span>Cuota IVA</span><span x-text="formatCurrency(iva)"></span></div>
+          <div class="flex justify-between py-2 border-t mt-2 text-xl font-bold"><span>TOTAL</span><span x-text="formatCurrency(total)"></span></div>
+        </div>
+      </div>
+      <div class="mt-12 pt-8 border-t-2 border-gray-200 flex justify-between gap-8 text-center print-only"><div class="w-1/2"><div class="border-b border-gray-800 h-20 mb-3"></div><p class="font-bold uppercase">Firma del taller</p><p class="text-xs text-gray-500" x-text="datos.taller.nombre"></p></div><div class="w-1/2"><div class="border-b border-gray-800 h-20 mb-3"></div><p class="font-bold uppercase">Conforme cliente</p><p class="text-xs text-gray-500" x-text="datos.cliente.nombre || 'Firma y DNI'"></p></div></div>
+      <div class="text-center text-xs text-gray-400 mt-4 print-only">Documento generado por AMR 17 Motorsport - <span x-text="new Date().toLocaleDateString('es-ES')"></span></div>
+    </div>
+    <div x-show="showHistorialModal" x-cloak class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 no-print">
+      <div class="bg-white rounded-xl w-full max-w-5xl max-h-[85vh] overflow-y-auto p-6">
+        <div class="flex justify-between items-center border-b pb-3 mb-4"><h3 class="text-lg font-bold">Historial del vehículo <span class="text-red-700 uppercase" x-text="datos.vehiculo.matricula"></span></h3><button @click="showHistorialModal=false" class="text-gray-500 text-2xl">&times;</button></div>
+        <template x-if="historialItems.length===0"><p class="text-gray-500 text-center py-4">No hay trabajos previos para este vehículo.</p></template>
+        <div class="space-y-4">
+          <template x-for="registro in historialItems" :key="registro.id">
+            <div class="bg-gray-50 border rounded p-4">
+              <div class="flex justify-between text-xs text-gray-500 mb-2"><span x-text="`Nº ${registro.numero || 'S/N'} · ${new Date(registro.fecha).toLocaleDateString('es-ES')}`"></span><span x-text="`Kms: ${registro.vehiculo?.kilometros || '-'}`"></span></div>
+              <div class="flex gap-3 mb-3 no-print"><button @click="cargarRegistro(registro)" class="px-3 py-2 rounded bg-blue-600 text-white text-xs">Cargar presupuesto</button><button @click="eliminarRegistro(registro.id)" class="px-3 py-2 rounded bg-red-600 text-white text-xs">Eliminar</button></div>
+              <ul class="list-disc pl-5 space-y-1 text-sm"><template x-for="item in registro.items" :key="item.id"><li x-text="item.descripcion + ' x' + item.cantidad"></li></template></ul>
+              <template x-if="registro.pdfTexto"><div class="mt-3 text-xs text-gray-600 border-t pt-2 whitespace-pre-line"><strong>Texto PDF:</strong><div x-text="registro.pdfTexto"></div></div></template>
+              <div class="text-right font-bold mt-2">Total: <span x-text="formatCurrency(registro.total)"></span></div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('presupuestoApp', () => ({
+        storageKey:'amr17_presupuestos', isSaving:false, ultimoKm:null, showHistorialModal:false, historialItems:[], pdfTexto:'',
+        datos:{ taller:{ nombre:'AMR 17 MOTORSPORT', slogan:'HIGH PERFORMANCE MECHANIC SHOP', direccion:'Calle Motor 17, Pol. Ind.', telefono:'600 000 000', cif:'B-12345678' }, numero:'Borrador', fecha:new Date().toISOString().split('T')[0], cliente:{ nombre:'', nif:'', telefono:'', email:'' }, vehiculo:{ marca:'', modelo:'', matricula:'', kilometros:'', bastidor:'' }, notas:'El presente presupuesto tiene una validez de 15 días. Las piezas sustituidas estarán a disposición del cliente.', porcentajeIva:21 },
+        items:[{ id:Date.now(), descripcion:'Mano de obra', cantidad:1, precio:45 }],
+        init(){ this.cargarAutoGuardado(); this.toast('Modo local activo','info'); },
+        toast(m,t='info'){ const c=document.getElementById('toast-container'); if(!c) return; const d=document.createElement('div'); d.className='toast '+t; d.textContent=m; c.appendChild(d); setTimeout(()=>{ d.style.opacity='0'; setTimeout(()=>d.remove(),250); },2500); },
+        generateId(){ return Date.now()+Math.floor(Math.random()*1000); },
+        formatCurrency(v){ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); },
+        get subtotal(){ return this.items.reduce((s,i)=>s+((parseFloat(i.cantidad)||0)*(parseFloat(i.precio)||0)),0); },
+        get iva(){ return this.subtotal*(this.datos.porcentajeIva/100); },
+        get total(){ return this.subtotal+this.iva; },
+        guardarBorrador(){ localStorage.setItem(this.storageKey+'_draft', JSON.stringify({datos:this.datos,items:this.items,pdfTexto:this.pdfTexto})); },
+        cargarAutoGuardado(){ try{ const d=JSON.parse(localStorage.getItem(this.storageKey+'_draft')||'null'); if(d){ this.datos=d.datos||this.datos; this.items=d.items||this.items; this.pdfTexto=d.pdfTexto||''; } }catch(e){} },
+        nuevoPresupuesto(){ this.datos={ taller:{ nombre:'AMR 17 MOTORSPORT', slogan:'HIGH PERFORMANCE MECHANIC SHOP', direccion:'Calle Motor 17, Pol. Ind.', telefono:'600 000 000', cif:'B-12345678' }, numero:'Borrador', fecha:new Date().toISOString().split('T')[0], cliente:{ nombre:'', nif:'', telefono:'', email:'' }, vehiculo:{ marca:'', modelo:'', matricula:'', kilometros:'', bastidor:'' }, notas:'El presente presupuesto tiene una validez de 15 días. Las piezas sustituidas estarán a disposición del cliente.', porcentajeIva:21 }; this.items=[{ id:this.generateId(), descripcion:'Mano de obra', cantidad:1, precio:45 }]; this.ultimoKm=null; this.pdfTexto=''; this.showHistorialModal=false; this.guardarBorrador(); this.toast('Presupuesto en blanco creado','info'); },
+        duplicarPresupuesto(){ const c=JSON.parse(JSON.stringify({datos:this.datos,items:this.items,pdfTexto:this.pdfTexto})); c.datos.numero='Borrador'; c.datos.fecha=new Date().toISOString().split('T')[0]; this.datos=c.datos; this.items=c.items.map(x=>({...x,id:this.generateId()})); this.pdfTexto=c.pdfTexto||''; this.guardarBorrador(); this.toast('Presupuesto duplicado','success'); },
+        addItem(tipo){ this.items.push({ id:this.generateId(), descripcion: tipo==='manoobra' ? 'Mano de obra' : 'Repuesto', cantidad:1, precio: tipo==='manoobra' ? 45 : 0 }); this.guardarBorrador(); },
+        removeItem(i){ this.items.splice(i,1); this.guardarBorrador(); },
+        guardarLocal(datos){ const lista=JSON.parse(localStorage.getItem(this.storageKey)||'[]'); lista.push({ id:String(Date.now()), ...datos }); localStorage.setItem(this.storageKey, JSON.stringify(lista)); },
+        obtenerLocal(){ return JSON.parse(localStorage.getItem(this.storageKey)||'[]'); },
+        async guardarEnBD(){ if(!this.datos.vehiculo.matricula && !this.datos.cliente.nombre){ this.toast('Añade matrícula o cliente','error'); return; } this.isSaving=true; try{ if(this.datos.numero==='Borrador'){ const y=new Date().getFullYear(); const n=Math.floor(Math.random()*9000)+1000; this.datos.numero=`PRE-${y}-${n}`; } const reg={ numero:this.datos.numero, fecha:this.datos.fecha, cliente:JSON.parse(JSON.stringify(this.datos.cliente)), vehiculo:{...this.datos.vehiculo, matricula:(this.datos.vehiculo.matricula||'').toUpperCase()}, notas:this.datos.notas, pdfTexto:this.pdfTexto, porcentajeIva:this.datos.porcentajeIva, items:JSON.parse(JSON.stringify(this.items)), subtotal:this.subtotal, iva:this.iva, total:this.total, timestamp:Date.now() }; this.guardarLocal(reg); this.guardarBorrador(); if(this.datos.vehiculo.kilometros) this.ultimoKm=this.datos.vehiculo.kilometros; this.toast('Presupuesto guardado','success'); }catch(e){ console.error(e); this.toast('Error al guardar','error'); } finally{ this.isSaving=false; } },
+        async buscarVehiculoPorMatricula(){ const m=(this.datos.vehiculo.matricula||'').trim().toUpperCase(); if(!m || m.length<4) return; const h=this.obtenerLocal().filter(r=>(r.vehiculo?.matricula||'').trim().toUpperCase()===m).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)); if(h.length){ const u=h[0]; this.datos.vehiculo.marca=u.vehiculo?.marca||''; this.datos.vehiculo.modelo=u.vehiculo?.modelo||''; this.datos.vehiculo.bastidor=u.vehiculo?.bastidor||''; if(u.vehiculo?.kilometros) this.ultimoKm=u.vehiculo.kilometros; if(!this.datos.cliente.nombre && u.cliente) this.datos.cliente={...u.cliente}; this.toast('Vehículo encontrado','info'); this.guardarBorrador(); } },
+        async verHistorialVehiculo(){ const m=(this.datos.vehiculo.matricula||'').trim().toUpperCase(); if(!m) return; this.historialItems=this.obtenerLocal().filter(r=>(r.vehiculo?.matricula||'').trim().toUpperCase()===m).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)); this.showHistorialModal=true; },
+        cargarRegistro(registro){ this.datos={ taller:{...this.datos.taller}, numero:registro.numero||'Borrador', fecha:registro.fecha||new Date().toISOString().split('T')[0], cliente:JSON.parse(JSON.stringify(registro.cliente||{nombre:'',nif:'',telefono:'',email:''})), vehiculo:JSON.parse(JSON.stringify(registro.vehiculo||{marca:'',modelo:'',matricula:'',kilometros:'',bastidor:''})), notas:registro.notas||'', porcentajeIva:registro.porcentajeIva ?? 21 }; this.items=(registro.items||[]).map(x=>({...x,id:this.generateId()})); this.pdfTexto=registro.pdfTexto||''; this.ultimoKm=this.datos.vehiculo.kilometros||null; this.showHistorialModal=false; this.guardarBorrador(); this.toast('Presupuesto cargado','success'); },
+        eliminarRegistro(id){ const lista=this.obtenerLocal().filter(r=>r.id!==id); localStorage.setItem(this.storageKey, JSON.stringify(lista)); this.verHistorialVehiculo(); this.toast('Registro eliminado','info'); },
+        async leerPDF(event){ const file=event.target.files?.[0]; if(!file) return; try{ const buffer=await file.arrayBuffer(); const pdf=await pdfjsLib.getDocument({data:buffer}).promise; let texto=''; for(let i=1;i<=pdf.numPages;i++){ const page=await pdf.getPage(i); const content=await page.getTextContent(); texto += content.items.map(it=>it.str).join(' ') + '\n'; } this.pdfTexto=texto.trim(); this.datos.notas=this.pdfTexto || this.datos.notas; this.toast('PDF leído correctamente','success'); this.guardarBorrador(); }catch(e){ console.error(e); this.toast('No se pudo leer el PDF','error'); } },
+      }))
+    })
+  </script>
+</body>
+</html>

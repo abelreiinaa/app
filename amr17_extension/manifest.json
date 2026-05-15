@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "AMR17 - Endado al Presupuesto",
+  "version": "1.0.1",
+  "description": "Captura nombre, referencia y precio de Endado y lo añade al presupuesto AMR17",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://www.endado.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.endado.com/p/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icon.png"
+    }
+  },
+  "icons": {
+    "48": "icon.png"
+  }
+}

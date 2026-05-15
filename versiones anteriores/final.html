@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Generador de Presupuestos - AMR 17 Motorsport</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    [x-cloak] { display: none !important; }
+    .print-only { display: none; }
+    @media print {
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      body { background: white; padding: 0; }
+      .container { box-shadow: none; border: none; max-width: 100%; }
+      input, textarea, select {
+        border: none !important;
+        background: transparent !important;
+        appearance: none;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8 text-gray-800">
+
+  <div x-data="presupuestoApp()" x-init="init()" class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 container">
+    <div class="bg-red-700 p-4 md:p-6 text-white flex flex-col md:flex-row justify-between items-center gap-4 no-print">
+      <div>
+        <h1 class="text-2xl font-bold">Generador de Presupuestos</h1>
+        <p class="text-sm text-red-100">AMR 17 Motorsport</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button @click="nuevoPresupuesto()" class="bg-red-800 hover:bg-red-900 px-4 py-2 rounded-lg font-semibold">Nuevo</button>
+        <button @click="guardarLocal()" class="bg-gray-900 hover:bg-black px-4 py-2 rounded-lg font-semibold">Guardar</button>
+        <button @click="window.print()" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg font-semibold">Imprimir</button>
+      </div>
+    </div>
+
+    <div class="p-6 md:p-8 space-y-8">
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="bg-gray-50 p-4 rounded-lg border">
+          <h2 class="font-bold text-red-700 mb-3">Datos del taller</h2>
+          <div class="space-y-3">
+            <input x-model="datos.taller.nombre" class="w-full border rounded p-2" placeholder="Nombre taller">
+            <input x-model="datos.taller.slogan" class="w-full border rounded p-2" placeholder="Slogan">
+            <input x-model="datos.taller.direccion" class="w-full border rounded p-2" placeholder="Dirección">
+            <div class="grid grid-cols-2 gap-3">
+              <input x-model="datos.taller.telefono" class="w-full border rounded p-2" placeholder="Teléfono">
+              <input x-model="datos.taller.cif" class="w-full border rounded p-2" placeholder="CIF/NIF">
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 p-4 rounded-lg border">
+          <h2 class="font-bold text-red-700 mb-3">Datos del presupuesto</h2>
+          <div class="space-y-3">
+            <input x-model="datos.numero" class="w-full border rounded p-2 bg-gray-100" readonly>
+            <input type="date" x-model="datos.fecha" class="w-full border rounded p-2">
+            <div class="grid grid-cols-2 gap-3">
+              <input x-model="datos.porcentajeIva" type="number" min="0" step="1" class="w-full border rounded p-2" placeholder="IVA">
+              <button @click="verHistorialVehiculo()" class="w-full bg-blue-600 text-white rounded p-2 font-semibold">Ver historial</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="bg-gray-50 p-4 rounded-lg border">
+          <h2 class="font-bold text-red-700 mb-3">Vehículo</h2>
+          <div class="space-y-3">
+            <input x-model="datos.vehiculo.matricula" @blur="buscarVehiculoPorMatricula()" class="w-full border rounded p-2 uppercase" placeholder="Matrícula">
+            <input type="number" x-model.number="datos.vehiculo.kilometros" class="w-full border rounded p-2" placeholder="Kilómetros">
+            <div class="grid grid-cols-2 gap-3">
+              <input x-model="datos.vehiculo.marca" class="w-full border rounded p-2" placeholder="Marca">
+              <input x-model="datos.vehiculo.modelo" class="w-full border rounded p-2" placeholder="Modelo">
+            </div>
+            <input x-model="datos.vehiculo.bastidor" class="w-full border rounded p-2 uppercase" placeholder="Bastidor / VIN">
+            <p class="text-xs text-blue-600" x-show="ultimoKm !== null" x-text="`Última vez: ${ultimoKm} km`" x-cloak></p>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 p-4 rounded-lg border">
+          <h2 class="font-bold text-red-700 mb-3">Cliente</h2>
+          <div class="space-y-3">
+            <input x-model="datos.cliente.nombre" class="w-full border rounded p-2" placeholder="Nombre / Razón social">
+            <input x-model="datos.cliente.nif" class="w-full border rounded p-2" placeholder="DNI / CIF">
+            <div class="grid grid-cols-2 gap-3">
+              <input x-model="datos.cliente.telefono" class="w-full border rounded p-2" placeholder="Teléfono">
+              <input x-model="datos.cliente.email" type="email" class="w-full border rounded p-2" placeholder="Email">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold border-l-4 border-red-700 pl-2">Trabajos y repuestos</h2>
+          <div class="flex gap-2 no-print">
+            <button @click="addItem('repuesto')" class="bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded border">+ Repuesto</button>
+            <button @click="addItem('manoobra')" class="bg-red-50 hover:bg-red-100 px-3 py-2 rounded border border-red-200">+ Mano de obra</button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto border rounded-lg">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-800 text-white">
+              <tr>
+                <th class="p-3 text-left">Concepto</th>
+                <th class="p-3 text-right">Cantidad</th>
+                <th class="p-3 text-right">Precio Ud.</th>
+                <th class="p-3 text-right">Total</th>
+                <th class="p-3 text-center no-print"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="(item, index) in items" :key="item.id">
+                <tr class="border-t">
+                  <td class="p-2">
+                    <input x-model="item.descripcion" class="w-full border rounded p-2" placeholder="Descripción">
+                  </td>
+                  <td class="p-2">
+                    <input type="number" min="0" step="1" x-model.number="item.cantidad" class="w-full border rounded p-2 text-right">
+                  </td>
+                  <td class="p-2">
+                    <input type="number" min="0" step="0.01" x-model.number="item.precio" class="w-full border rounded p-2 text-right">
+                  </td>
+                  <td class="p-2 text-right font-semibold" x-text="formatCurrency(item.cantidad * item.precio)"></td>
+                  <td class="p-2 text-center no-print">
+                    <button @click="removeItem(index)" class="text-red-600 font-bold">X</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6">
+        <div>
+          <h3 class="font-bold mb-2">Observaciones / Condiciones</h3>
+          <textarea x-model="datos.notas" rows="5" class="w-full border rounded-lg p-3"></textarea>
+        </div>
+
+        <div class="bg-gray-900 text-white rounded-xl p-6">
+          <div class="flex justify-between py-1">
+            <span>Base imponible</span>
+            <span x-text="formatCurrency(subtotal)"></span>
+          </div>
+          <div class="flex justify-between py-1">
+            <span>IVA</span>
+            <span x-text="datos.porcentajeIva + '%'"></span>
+          </div>
+          <div class="flex justify-between py-1">
+            <span>Cuota IVA</span>
+            <span x-text="formatCurrency(iva)"></span>
+          </div>
+          <div class="flex justify-between py-2 border-t mt-2 text-xl font-bold">
+            <span>TOTAL</span>
+            <span x-text="formatCurrency(total)"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-12 pt-8 border-t-2 border-gray-200 flex justify-between gap-8 text-center print-only">
+        <div class="w-1/2">
+          <div class="border-b border-gray-800 h-20 mb-3"></div>
+          <p class="font-bold uppercase">Firma del taller</p>
+          <p class="text-xs text-gray-500" x-text="datos.taller.nombre"></p>
+        </div>
+        <div class="w-1/2">
+          <div class="border-b border-gray-800 h-20 mb-3"></div>
+          <p class="font-bold uppercase">Conforme cliente</p>
+          <p class="text-xs text-gray-500" x-text="datos.cliente.nombre || 'Firma y DNI'"></p>
+        </div>
+      </div>
+    </div>
+
+    <div x-show="showHistorialModal" x-cloak class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 no-print">
+      <div class="bg-white rounded-xl w-full max-w-3xl max-h-[80vh] overflow-y-auto p-6">
+        <div class="flex justify-between items-center border-b pb-3 mb-4">
+          <h3 class="text-lg font-bold">Historial del vehículo <span class="text-red-700 uppercase" x-text="datos.vehiculo.matricula"></span></h3>
+          <button @click="showHistorialModal = false" class="text-gray-500 text-2xl">&times;</button>
+        </div>
+
+        <template x-if="historialItems.length === 0">
+          <p class="text-gray-500 text-center py-4">No hay trabajos previos para este vehículo.</p>
+        </template>
+
+        <div class="space-y-4">
+          <template x-for="registro in historialItems" :key="registro.id">
+            <div class="bg-gray-50 border rounded p-4">
+              <div class="flex justify-between text-xs text-gray-500 mb-2">
+                <span x-text="`Nº ${registro.numero || 'S/N'} · ${new Date(registro.fecha).toLocaleDateString('es-ES')}`"></span>
+                <span x-text="`Kms: ${registro.vehiculo?.kilometros || '-'}`"></span>
+              </div>
+              <ul class="list-disc pl-5 space-y-1 text-sm">
+                <template x-for="item in registro.items" :key="item.id">
+                  <li x-text="item.descripcion + ' x' + item.cantidad"></li>
+                </template>
+              </ul>
+              <div class="text-right font-bold mt-2">
+                Total: <span x-text="formatCurrency(registro.total)"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('presupuestoApp', () => ({
+        storageKey: 'amr17_presupuestos',
+        showHistorialModal: false,
+        historialItems: [],
+        ultimoKm: null,
+
+        datos: {
+          taller: {
+            nombre: 'AMR 17 MOTORSPORT',
+            slogan: 'HIGH PERFORMANCE MECHANIC SHOP',
+            direccion: 'Calle Motor 17, Pol. Ind.',
+            telefono: '600 000 000',
+            cif: 'B-12345678'
+          },
+          numero: 'Borrador',
+          fecha: new Date().toISOString().split('T')[0],
+          cliente: { nombre: '', nif: '', telefono: '', email: '' },
+          vehiculo: { marca: '', modelo: '', matricula: '', kilometros: '', bastidor: '' },
+          notas: 'El presente presupuesto tiene una validez de 15 días. Las piezas sustituidas estarán a disposición del cliente.',
+          porcentajeIva: 21
+        },
+
+        items: [
+          { id: Date.now(), descripcion: 'Mano de obra', cantidad: 1, precio: 45 }
+        ],
+
+        init() {
+          this.cargarUltimoBorrador();
+        },
+
+        generarId() {
+          return Date.now() + Math.floor(Math.random() * 1000);
+        },
+
+        nuevoPresupuesto() {
+          this.datos = {
+            taller: {
+              nombre: 'AMR 17 MOTORSPORT',
+              slogan: 'HIGH PERFORMANCE MECHANIC SHOP',
+              direccion: 'Calle Motor 17, Pol. Ind.',
+              telefono: '600 000 000',
+              cif: 'B-12345678'
+            },
+            numero: 'Borrador',
+            fecha: new Date().toISOString().split('T')[0],
+            cliente: { nombre: '', nif: '', telefono: '', email: '' },
+            vehiculo: { marca: '', modelo: '', matricula: '', kilometros: '', bastidor: '' },
+            notas: 'El presente presupuesto tiene una validez de 15 días. Las piezas sustituidas estarán a disposición del cliente.',
+            porcentajeIva: 21
+          };
+          this.items = [{ id: this.generarId(), descripcion: 'Mano de obra', cantidad: 1, precio: 45 }];
+          this.ultimoKm = null;
+          this.historialItems = [];
+          this.showHistorialModal = false;
+        },
+
+        addItem(tipo) {
+          if (tipo === 'repuesto') {
+            this.items.push({ id: this.generarId(), descripcion: 'Repuesto', cantidad: 1, precio: 0 });
+          } else {
+            this.items.push({ id: this.generarId(), descripcion: 'Mano de obra', cantidad: 1, precio: 45 });
+          }
+        },
+
+        removeItem(index) {
+          this.items.splice(index, 1);
+        },
+
+        formatCurrency(v) {
+          return new Intl.NumberFormat('es-ES', {
+            style: 'currency',
+            currency: 'EUR'
+          }).format(Number(v || 0));
+        },
+
+        get subtotal() {
+          return this.items.reduce((sum, item) => {
+            return sum + (Number(item.cantidad || 0) * Number(item.precio || 0));
+          }, 0);
+        },
+
+        get iva() {
+          return this.subtotal * (Number(this.datos.porcentajeIva || 0) / 100);
+        },
+
+        get total() {
+          return this.subtotal + this.iva;
+        },
+
+        guardarLocal() {
+          const lista = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+
+          if (this.datos.numero === 'Borrador') {
+            const year = new Date().getFullYear();
+            const num = Math.floor(Math.random() * 9000) + 1000;
+            this.datos.numero = `PRE-${year}-${num}`;
+          }
+
+          const registro = {
+            id: this.generarId(),
+            numero: this.datos.numero,
+            fecha: this.datos.fecha,
+            cliente: JSON.parse(JSON.stringify(this.datos.cliente)),
+            vehiculo: JSON.parse(JSON.stringify(this.datos.vehiculo)),
+            notas: this.datos.notas,
+            porcentajeIva: this.datos.porcentajeIva,
+            items: JSON.parse(JSON.stringify(this.items)),
+            subtotal: this.subtotal,
+            iva: this.iva,
+            total: this.total,
+            timestamp: Date.now()
+          };
+
+          lista.push(registro);
+          localStorage.setItem(this.storageKey, JSON.stringify(lista));
+          this.ultimoKm = this.datos.vehiculo.kilometros || null;
+          alert('Presupuesto guardado localmente');
+        },
+
+        cargarUltimoBorrador() {
+          const lista = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+          if (lista.length > 0) {
+            const ultimo = lista[lista.length - 1];
+            if (ultimo.vehiculo?.matricula) {
+              this.ultimoKm = ultimo.vehiculo.kilometros || null;
+            }
+          }
+        },
+
+        buscarVehiculoPorMatricula() {
+          const matricula = this.datos.vehiculo.matricula.trim().toUpperCase();
+          if (!matricula) return;
+
+          const lista = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+          const historial = lista
+            .filter(r => (r.vehiculo?.matricula || '').trim().toUpperCase() === matricula)
+            .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+          if (historial.length > 0) {
+            const ultimo = historial[0];
+            this.datos.vehiculo.marca = ultimo.vehiculo?.marca || '';
+            this.datos.vehiculo.modelo = ultimo.vehiculo?.modelo || '';
+            this.datos.vehiculo.bastidor = ultimo.vehiculo?.bastidor || '';
+            if (ultimo.vehiculo?.kilometros) this.ultimoKm = ultimo.vehiculo.kilometros;
+            if (!this.datos.cliente.nombre && ultimo.cliente) {
+              this.datos.cliente = JSON.parse(JSON.stringify(ultimo.cliente));
+            }
+          }
+        },
+
+        verHistorialVehiculo() {
+          const matricula = this.datos.vehiculo.matricula.trim().toUpperCase();
+          if (!matricula) return;
+
+          const lista = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+          this.historialItems = lista
+            .filter(r => (r.vehiculo?.matricula || '').trim().toUpperCase() === matricula)
+            .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+          this.showHistorialModal = true;
+        }
+      }));
+    });
+  </script>
+</body>
+</html>
