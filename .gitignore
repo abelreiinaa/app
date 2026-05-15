@@ -1,0 +1,26 @@
+# Node / misc
+node_modules/
+.env
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Archives and heavy binaries
+*.zip
+*.tar.gz
+*.7z
+*.exe
+*.dll
+*.so
+
+# Documents / exports
+*.pdf
+PRESUPUESTO MECANICOS/
+
+# Editor temp
+*.log
+__pycache__/
+
+# OS files
+desktop.ini
