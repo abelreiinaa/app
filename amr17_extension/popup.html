@@ -18,7 +18,7 @@
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8 text-gray-800">
-  <div x-data="presupuestoApp()" x-init="init()" class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden container border border-gray-200">
+  <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden container border border-gray-200">
     <div id="toast-container" class="toast-container no-print"></div>
     <div class="bg-red-700 p-4 md:p-6 text-white flex flex-col md:flex-row justify-between items-center no-print gap-4">
       <div>
@@ -28,6 +28,8 @@
       <div class="flex gap-2">
         <button type="button" id="btn-cargar-cola" class="bg-white text-red-700 px-4 py-2 rounded-lg font-semibold hover:bg-red-50">Cargar cola</button>
         <button type="button" id="btn-exportar" class="bg-red-900 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-800">Exportar</button>
+        <button type="button" id="btn-ver-cola" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100">Ver cola</button>
+        <button type="button" id="btn-insertar-muestra" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-500">Insertar muestra</button>
       </div>
     </div>
 
@@ -47,6 +49,10 @@
           <label class="flex items-center gap-2"><input id="mostrar-precios" type="checkbox" checked> Mostrar precios</label>
           <label class="flex items-center gap-2 mt-2"><input id="impuestos" type="checkbox" checked> Incluir IVA</label>
         </div>
+      </section>
+      <section class="p-4 no-print">
+        <h3 class="font-semibold mb-2">Depuración</h3>
+        <div id="debug-cola" class="bg-white border rounded p-3 text-xs text-gray-800 max-h-48 overflow-auto"></div>
       </section>
 
       <section>
@@ -99,13 +105,14 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'amr17cola';
-    const state = { lineas: [], impuestos: true, mostrarPrecios: true };
+  const STORAGE_KEY = 'amr17cola';
+  const LOCAL_STORAGE_KEY = 'amr17_presupuesto';
+  const state = { lineas: [], impuestos: true, mostrarPrecios: true };
 
     function eur(n){ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(n||0)); }
-    function toast(msg,type='info'){ const c=document.getElementById('toast-container'); const d=document.createElement('div'); d.className='toast '+type; d.textContent=msg; c.appendChild(d); setTimeout(()=>d.remove(),2500); }
-    function save(){ localStorage.setItem('amr17_presupuesto', JSON.stringify(state)); }
-    function load(){ try { const s=JSON.parse(localStorage.getItem('amr17_presupuesto')||'{}'); Object.assign(state,s); } catch(e){} }
+    function toast(msg,type='info'){ const c=document.getElementById('toast-container'); const d=document.createElement('div'); d.className='toast '+type; d.textContent=msg; c.appendChild(d); setTimeout(()=>d.remove(),3500); }
+    function save(){ localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state)); }
+    function load(){ try { const s=JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)||'{}'); Object.assign(state,s); } catch(e){} }
     function calc(){
       const tbody=document.getElementById('lineas-body');
       tbody.innerHTML='';
@@ -117,6 +124,10 @@
         const total = precio*qty;
         base += total;
         const margen = coste>0 ? ((precio-coste)/coste*100) : 0;
+        
+        // Guardamos el precioVenta real si era nulo para que no se pierda al exportar
+        l.precioVenta = precio;
+
         const tr=document.createElement('tr');
         tr.className='border-t';
         tr.innerHTML=`<td class="p-3"><input data-k="nombre" data-i="${idx}" class="w-full border rounded px-2 py-1" value="${(l.nombre||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')}"></td>
@@ -139,8 +150,70 @@
 
     function bind(){
       document.getElementById('btn-nueva-linea').addEventListener('click', ()=>{ state.lineas.push({nombre:'',referencia:'',cantidad:1,precio:0,precioVenta:0}); calc(); });
-      document.getElementById('btn-cargar-cola').addEventListener('click', async ()=>{ const res = await chrome.storage.local.get([STORAGE_KEY]); const cola = Array.isArray(res[STORAGE_KEY]) ? res[STORAGE_KEY] : []; if(!cola.length){ toast('No hay cola para cargar','error'); return; } cola.forEach(it=>state.lineas.push({nombre:it.nombre||'',referencia:it.referencia||'',cantidad:it.cantidad||1,precio:it.precio||0,precioVenta:it.precio||0,url:it.url||''})); await chrome.storage.local.set({[STORAGE_KEY]:[]}); toast('Cola cargada','success'); calc(); });
+      
+      // -- AQUI ESTÁ LA CORRECCIÓN DE LA COLA Y SEGURIDAD --
+      document.getElementById('btn-cargar-cola').addEventListener('click', ()=>{
+        if (typeof chrome === 'undefined' || !chrome.storage) {
+          toast('⚠️ ALERTA: Estás en una web normal. Debes abrir la app desde el icono de tu extensión para poder leer la memoria.', 'error');
+          return;
+        }
+
+        chrome.storage.local.get([STORAGE_KEY], res => {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            toast('Error al leer la extensión', 'error');
+            return;
+          }
+          const cola = Array.isArray(res[STORAGE_KEY]) ? res[STORAGE_KEY] : [];
+          if (!cola.length) { toast('No hay artículos en la cola para cargar','error'); return; }
+
+          cola.forEach(it => state.lineas.push({
+            nombre: it.nombre || '',
+            referencia: it.referencia || '',
+            cantidad: it.cantidad || 1,
+            precio: it.precio || 0,
+            url: it.url || ''
+          }));
+
+          chrome.storage.local.set({ [STORAGE_KEY]: [] }, () => {
+            if (chrome.runtime && chrome.runtime.lastError) {
+              toast('Error al limpiar la cola', 'error');
+              return;
+            }
+            toast('Cola cargada con éxito','success');
+            calc();
+          });
+        });
+      });
+      
       document.getElementById('btn-exportar').addEventListener('click', ()=>{ toast('Exportación pendiente','info'); });
+      document.getElementById('btn-ver-cola').addEventListener('click', ()=>{
+        const out = document.getElementById('debug-cola');
+        out.textContent = 'Cargando...';
+        if (typeof chrome === 'undefined' || !chrome.storage) {
+          // fallback a localStorage para pruebas fuera de extensión
+          try { out.textContent = localStorage.getItem(STORAGE_KEY) || '[]'; } catch(e){ out.textContent = 'No disponible'; }
+          return;
+        }
+        chrome.storage.local.get([STORAGE_KEY], res => {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            out.textContent = 'Error: '+chrome.runtime.lastError.message;
+            return;
+          }
+          out.textContent = JSON.stringify(Array.isArray(res[STORAGE_KEY]) ? res[STORAGE_KEY] : [], null, 2);
+        });
+      });
+
+      document.getElementById('btn-insertar-muestra').addEventListener('click', ()=>{
+        const muestra = [{ nombre:'Disco de freno', referencia:'DF-1234', precio:45.5, cantidad:1, url:'https://example.com' }];
+        if (typeof chrome === 'undefined' || !chrome.storage) {
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(muestra)); toast('Muestra insertada en localStorage','success'); } catch(e){ toast('Error al insertar muestra','error'); }
+          return;
+        }
+        chrome.storage.local.set({ [STORAGE_KEY]: muestra }, ()=>{
+          if (chrome.runtime && chrome.runtime.lastError) { toast('Error al insertar muestra','error'); return; }
+          toast('Muestra insertada en la cola','success');
+        });
+      });
       document.getElementById('mostrar-precios').addEventListener('change', e=>{ state.mostrarPrecios=e.target.checked; calc(); });
       document.getElementById('impuestos').addEventListener('change', e=>{ state.impuestos=e.target.checked; calc(); });
       document.getElementById('lineas-body').addEventListener('input', e=>{ const i=e.target.dataset.i; const k=e.target.dataset.k; if(i===undefined||!k) return; state.lineas[i][k] = e.target.type==='number' ? Number(e.target.value||0) : e.target.value; calc(); });
@@ -148,7 +221,6 @@
     }
 
     function init(){ load(); bind(); calc(); }
-    window.presupuestoApp = () => ({ init });
     document.addEventListener('DOMContentLoaded', init);
   </script>
 </body>

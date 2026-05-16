@@ -104,14 +104,47 @@
       const qty = Math.max(1, parseInt(wrap.querySelector('#amr17-qty').value || '1', 10));
       if (!nombre) { status.textContent = 'El nombre no puede estar vacío'; status.style.color = '#dc2626'; return; }
       const item = { nombre, referencia: ref, precio, cantidad: qty, url: datos.url };
+
+      console.debug('AMR17: Añadiendo item a la cola', item);
+
+      if (typeof chrome === 'undefined' || !chrome.storage) {
+        // fallback para pruebas fuera de extensión
+        try {
+          const raw = localStorage.getItem(KEY);
+          const cola = raw ? JSON.parse(raw) : [];
+          cola.push(item);
+          localStorage.setItem(KEY, JSON.stringify(cola));
+          status.textContent = 'Añadido a la cola (localStorage)';
+          status.style.color = '#059669';
+          addBtn.textContent = 'Añadido';
+          setTimeout(() => { addBtn.textContent = 'Añadir al presupuesto'; status.textContent = ''; }, 1800);
+          console.debug('AMR17: Cola ahora (localStorage)', cola);
+        } catch (e) {
+          console.error('AMR17 error localStorage', e);
+          status.textContent = 'Error al añadir (localStorage)'; status.style.color = '#dc2626';
+        }
+        return;
+      }
+
       chrome.storage.local.get([KEY], res => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          console.error('AMR17 get error', chrome.runtime.lastError);
+          status.textContent = 'Error al acceder a la extensión'; status.style.color = '#dc2626';
+          return;
+        }
         const cola = Array.isArray(res[KEY]) ? res[KEY] : [];
         cola.push(item);
         chrome.storage.local.set({ [KEY]: cola }, () => {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            console.error('AMR17 set error', chrome.runtime.lastError);
+            status.textContent = 'Error al guardar en la extensión'; status.style.color = '#dc2626';
+            return;
+          }
           status.textContent = 'Añadido a la cola del presupuesto';
           status.style.color = '#059669';
           addBtn.textContent = 'Añadido';
           setTimeout(() => { addBtn.textContent = 'Añadir al presupuesto'; status.textContent = ''; }, 1800);
+          console.debug('AMR17: Cola ahora (chrome.storage)', cola);
         });
       });
     });

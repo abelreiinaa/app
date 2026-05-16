@@ -1,0 +1,27 @@
+{
+  "name": "amr-17-motorsport-mechanic-shop",
+  "version": "1.0.0",
+  "description": "Proyecto: generador de presupuestos para AMR 17 Motorsport.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abelreiinaa/app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/abelreiinaa/app/issues"
+  },
+  "homepage": "https://github.com/abelreiinaa/app#readme",
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "playwright": "^1.60.0"
+  }
+}
